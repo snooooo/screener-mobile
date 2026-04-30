@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Mobile Flipbook — 2026-04-27 (100 銘柄)</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text2: #8b949e;
+      --text3: #484f58;
+      --accent: #58a6ff;
+      --green: #3fb950;
+      --green-bg: rgba(63,185,80,.15);
+      --amber: #d29922;
+      --amber-bg: rgba(210,153,34,.15);
+      --gray-b: #484f58;
+      --gray-bg: rgba(72,79,88,.3);
+      --tag-bg: rgba(56,139,253,.15);
+      --tag-c: #58a6ff;
+    }
+
+    html, body {
+      height: 100%; width: 100%;
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Noto Sans JP', sans-serif;
+      overflow: hidden;
+      -webkit-text-size-adjust: 100%;
+      touch-action: pan-y;
+    }
+
+    #wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    #header {
+      padding: 10px 14px 8px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .counter {
+      color: var(--text2);
+      font-size: 0.82rem;
+      font-variant-numeric: tabular-nums;
+      min-width: 60px;
+    }
+    .ticker {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: 0.5px;
+    }
+    .price-tag {
+      margin-left: auto;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .name-row {
+      font-size: 0.75rem;
+      color: var(--text2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sector-row {
+      font-size: 0.7rem;
+      color: var(--text3);
+      margin-bottom: 4px;
+    }
+    .themes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+    .theme-badge {
+      font-size: 0.6rem;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: var(--tag-bg);
+      color: var(--tag-c);
+      font-weight: 500;
+    }
+
+    /* ── Scores row ────────────────────────────────────────── */
+    .scores-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 2px;
+    }
+    .score-pill {
+      flex: 1;
+      text-align: center;
+      padding: 4px 2px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+    .score-high { background: var(--green-bg); color: var(--green); }
+    .score-mid  { background: var(--amber-bg); color: var(--amber); }
+    .score-low  { background: var(--gray-bg); color: var(--gray-b); }
+
+    /* ── Chart stage ───────────────────────────────────────── */
+    #stage {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+    #chart {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+      transition: opacity 0.15s ease;
+    }
+    #chart.loading { opacity: 0.4; }
+
+    /* Tap zones overlay (invisible) */
+    .tap-zone {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 35%;
+      z-index: 10;
+      /* debug: background: rgba(255,0,0,0.1); */
+    }
+    .tap-zone.left { left: 0; }
+    .tap-zone.right { right: 0; }
+
+    /* Swipe indicator */
+    .swipe-indicator {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 2.5rem;
+      color: rgba(255,255,255,0.5);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .swipe-indicator.left { left: 12px; }
+    .swipe-indicator.right { right: 12px; }
+    .swipe-indicator.show { opacity: 1; }
+
+    /* ── Footer toolbar ────────────────────────────────────── */
+    #footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      padding: 8px 14px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      gap: 6px;
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+    }
+    .footer-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 8px 14px;
+      border-radius: 10px;
+      background: var(--tag-bg);
+      color: var(--tag-c);
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .footer-btn:active {
+      background: var(--accent);
+      color: #fff;
+      transform: scale(0.95);
+    }
+
+    /* ── Search overlay ────────────────────────────────────── */
+    #searchOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      padding: 16px;
+      padding-top: max(16px, env(safe-area-inset-top));
+    }
+    #searchOverlay.show { display: flex; }
+    #searchOverlay input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 1rem;
+      outline: none;
+      margin-bottom: 10px;
+    }
+    #searchOverlay input:focus { border-color: var(--accent); }
+    .search-results {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .search-result {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .search-result:active { background: var(--accent); color: #fff; }
+    .search-result .sr-ticker { font-weight: 700; color: var(--accent); }
+    .search-result .sr-name { color: var(--text2); font-size: 0.8rem; margin-left: 8px; }
+    .search-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--border);
+      color: var(--text);
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Progress bar ──────────────────────────────────────── */
+    #progressBar {
+      height: 2px;
+      background: var(--accent);
+      transition: width 0.2s ease;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+    }
+    #header { position: relative; }
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <div id="header">
+    <div class="header-top">
+      <span class="counter" id="counter">— / —</span>
+      <span class="ticker" id="ticker">—</span>
+      <span class="price-tag" id="price"></span>
+    </div>
+    <div class="name-row" id="name"></div>
+    <div class="sector-row" id="sector"></div>
+    <div class="themes" id="themes"></div>
+    <div class="scores-row" id="scores"></div>
+    <div id="progressBar"></div>
+  </div>
+
+  <div id="stage">
+    <div class="tap-zone left" id="tapLeft"></div>
+    <div class="tap-zone right" id="tapRight"></div>
+    <span class="swipe-indicator left" id="indLeft">‹</span>
+    <span class="swipe-indicator right" id="indRight">›</span>
+    <img id="chart" alt="chart">
+  </div>
+
+  <div id="footer">
+    <a id="tv-btn" class="footer-btn" href="#" target="_blank" rel="noopener">📈 TV</a>
+    <button class="footer-btn" id="searchBtn">🔍 検索</button>
+    <button class="footer-btn" id="listBtn">📋 一覧</button>
+  </div>
+</div>
+
+<!-- Search overlay -->
+<div id="searchOverlay">
+  <button class="search-close" id="searchClose">✕</button>
+  <input id="searchInput" type="search" placeholder="🔍 ティッカー / 銘柄名 / 番号" autocomplete="off">
+  <div class="search-results" id="searchResults"></div>
+</div>
+
+<script>
+  const META = [{"i": 0, "ticker": "EWCZ", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/EWCZ.png", "name": "European Wax Center, Inc. - Class A Common Stock", "sector": "Consumer Defensive", "industry": "", "themes": [], "price": 5.809999942779541, "rs": 0.8720349669456482, "rs_line_vs_hi_pct": -22.58575281702433, "vs_hi_pct": -8.647799491882324, "vcp_ratio": 0.7287452519048366, "vol_contraction": 0.4222306824697164, "setup_score": 0.7189678936408863, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.6620611559162841, "leading_score": 0.5319641853290829}, {"i": 1, "ticker": "TD", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/TD.png", "name": "Toronto Dominion Bank (The) Common Stock", "sector": "Financial Services", "industry": "Banks - Diversified", "themes": ["🏦 銀行"], "price": 105.63999938964844, "rs": 0.8069080114364624, "rs_line_vs_hi_pct": -0.723620191674823, "vs_hi_pct": -0.7236182689666748, "vcp_ratio": 0.7299329201634799, "vol_contraction": 0.5260707023489521, "setup_score": 0.6671068039362716, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.35488013232313215, "leading_score": 0.8185710661723966}, {"i": 2, "ticker": "HG", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/HG.png", "name": "Hamilton Insurance Group, Ltd. Class B Common Shares", "sector": "Financial Services", "industry": "Insurance - Reinsurance", "themes": ["🏦 保険"], "price": 32.5, "rs": 0.8343737125396729, "rs_line_vs_hi_pct": -1.5516182913707932, "vs_hi_pct": -0.8844196796417236, "vcp_ratio": 0.7193300771822662, "vol_contraction": 0.559907256778811, "setup_score": 0.6631236821568554, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.7023745473893801, "leading_score": 0.809549558206117}, {"i": 3, "ticker": "DSX", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/DSX.png", "name": "Diana Shipping inc. common stock", "sector": "Industrials", "industry": "Marine Shipping", "themes": ["🚢 海運"], "price": 2.5, "rs": 0.8372867107391357, "rs_line_vs_hi_pct": -9.79014719587925, "vs_hi_pct": -5.660378932952881, "vcp_ratio": 0.6741763502031692, "vol_contraction": 0.4309111619649656, "setup_score": 0.6554788804234062, "yartseva": 1.0, "comp_pass": 1.0, "comp_score": 0.774919371123604, "leading_score": 0.6357053597768147}, {"i": 4, "ticker": "PKST", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/PKST.png", "name": "Peakstone Realty Trust Common Shares", "sector": "Real Estate", "industry": "REIT - Office", "themes": ["🏢 REIT"], "price": 20.969999313354492, "rs": 0.8878484964370728, "rs_line_vs_hi_pct": -10.637660270951644, "vs_hi_pct": 0.0, "vcp_ratio": 0.4692619924547891, "vol_contraction": 0.6472299268161354, "setup_score": 0.6523987431349455, "yartseva": 1.0, "comp_pass": 1.0, "comp_score": 0.6821824979660829, "leading_score": 0.6514705060392564}, {"i": 5, "ticker": "KYMR", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/KYMR.png", "name": "Kymera Therapeutics, Inc. - Common Stock", "sector": "Healthcare", "industry": "Biotechnology", "themes": ["🧬 バイオ"], "price": 86.68000030517578, "rs": 0.9151061177253723, "rs_line_vs_hi_pct": -11.686529648212417, "vs_hi_pct": -8.786696434020996, "vcp_ratio": 0.763785536256427, "vol_contraction": 0.6108259666067869, "setup_score": 0.6467662440324218, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.37231485676246373, "leading_score": 0.6481529357437662}, {"i": 6, "ticker": "HLIO", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/HLIO.png", "name": "Helios Technologies, Inc. Common Stock", "sector": "Industrials", "industry": "Specialty Industrial Machinery", "themes": ["⚙️ 産業機械"], "price": 69.18000030517578, "rs": 0.8832709193229675, "rs_line_vs_hi_pct": -12.272654320304376, "vs_hi_pct": -8.552545547485352, "vcp_ratio": 0.7539187420444476, "vol_contraction": 0.6307992453922997, "setup_score": 0.6466308362550399, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.5489171054409794, "leading_score": 0.6203086830662031}, {"i": 7, "ticker": "CVEO", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/CVEO.png", "name": "Civeo Corporation (Canada) Common Shares", "sector": "Consumer Cyclical", "industry": "", "themes": [], "price": 31.3700008392334, "rs": 0.8179358839988708, "rs_line_vs_hi_pct": -0.2860719893780228, "vs_hi_pct": -0.2860724925994873, "vcp_ratio": 0.6934609773246583, "vol_contraction": 0.5289091363025592, "setup_score": 0.6441399585740066, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.5099513868330827, "leading_score": 0.8361167395375466}, {"i": 8, "ticker": "LINC", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/LINC.png", "name": "Lincoln Educational Services Corporation - Common Stock", "sector": "Consumer Defensive", "industry": "Education & Training Services", "themes": ["🎓 教育"], "price": 39.81999969482422, "rs": 0.9267582297325134, "rs_line_vs_hi_pct": -13.352453838755086, "vs_hi_pct": -6.613504886627197, "vcp_ratio": 0.7645891350729266, "vol_contraction": 0.5086367343844199, "setup_score": 0.6402746443629623, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.43700973154404876, "leading_score": 0.6325576820008741}, {"i": 9, "ticker": "KEYS", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/KEYS.png", "name": "Keysight Technologies Inc. Common Stock", "sector": "Technology", "industry": "Scientific & Technical Instruments", "themes": ["🔬 計測/精密機器"], "price": 340.6400146484375, "rs": 0.9479817152023315, "rs_line_vs_hi_pct": -1.8215289838277804, "vs_hi_pct": -1.8215298652648926, "vcp_ratio": 0.7009884319166848, "vol_contraction": 0.5655454166412599, "setup_score": 0.6393221454341196, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.4434509320555428, "leading_score": 0.8682426167967541}, {"i": 10, "ticker": "TRGP", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/TRGP.png", "name": "Targa Resources, Inc. Common Stock", "sector": "Energy", "industry": "", "themes": [], "price": 241.2899932861328, "rs": 0.8279234170913696, "rs_line_vs_hi_pct": -13.81900743010388, "vs_hi_pct": -3.8608670234680176, "vcp_ratio": 0.7171069983908316, "vol_contraction": 0.5626989596118759, "setup_score": 0.6386389742612357, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.3762492120311728, "leading_score": 0.5681566301482188}, {"i": 11, "ticker": "CW", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/CW.png", "name": "Curtiss-Wright Corporation Common Stock", "sector": "Industrials", "industry": "Aerospace & Defense", "themes": ["🛡️ 防衛/宇宙"], "price": 717.1599731445312, "rs": 0.8470661640167236, "rs_line_vs_hi_pct": -6.357605927153454, "vs_hi_pct": -3.4271061420440674, "vcp_ratio": 0.7648640346931227, "vol_contraction": 0.5574502188329616, "setup_score": 0.6368453083265437, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.43913752493786345, "leading_score": 0.7013180703196152}, {"i": 12, "ticker": "ATRO", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/ATRO.png", "name": "Astronics Corporation - Common Stock", "sector": "Industrials", "industry": "Aerospace & Defense", "themes": ["🛡️ 防衛/宇宙"], "price": 73.41000366210938, "rs": 0.9309197068214417, "rs_line_vs_hi_pct": -12.855714564612807, "vs_hi_pct": -9.760290145874023, "vcp_ratio": 0.8116626727758853, "vol_contraction": 0.5512263298972908, "setup_score": 0.6346363421484048, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.44618816871783235, "leading_score": 0.6416119572243404}, {"i": 13, "ticker": "BTSG", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/BTSG.png", "name": "BrightSpring Health Services, Inc. - Common Stock", "sector": "Healthcare", "industry": "Health Information Services", "themes": ["🏥 医療"], "price": 48.56999969482422, "rs": 0.9386184215545654, "rs_line_vs_hi_pct": -0.17174398178503303, "vs_hi_pct": 0.0, "vcp_ratio": 0.7227027793237282, "vol_contraction": 0.5522747115732667, "setup_score": 0.634379385061539, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.5000865339507504, "leading_score": 0.9128978646518102}, {"i": 14, "ticker": "QUAD", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/QUAD.png", "name": "Quad Graphics, Inc Class A Common Stock", "sector": "Industrials", "industry": "", "themes": [], "price": 7.71999979019165, "rs": 0.8075322508811951, "rs_line_vs_hi_pct": -2.1546271124294414, "vs_hi_pct": -2.1546244621276855, "vcp_ratio": 0.6945103482587097, "vol_contraction": 0.5838963919471997, "setup_score": 0.6338010744279317, "yartseva": 1.0, "comp_pass": 1.0, "comp_score": 0.6166106042207868, "leading_score": 0.778144134762943}, {"i": 15, "ticker": "ABX", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/ABX.png", "name": "Abacus Global Management, Inc. Class A Common Stock", "sector": "Financial Services", "industry": "", "themes": [], "price": 9.319999694824219, "rs": 0.8239700198173523, "rs_line_vs_hi_pct": -16.16695182629987, "vs_hi_pct": -9.60233211517334, "vcp_ratio": 0.6991156975557254, "vol_contraction": 0.5345666193360753, "setup_score": 0.6333239787096498, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.4081572204212586, "leading_score": 0.5431980529552384}, {"i": 16, "ticker": "AMPY", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/AMPY.png", "name": "Amplify Energy Corp. Common Stock", "sector": "Energy", "industry": "", "themes": [], "price": 6.0, "rs": 0.8913857936859131, "rs_line_vs_hi_pct": -18.255420594828774, "vs_hi_pct": -9.502262115478516, "vcp_ratio": 0.6866889087017155, "vol_contraction": 0.6118064228799839, "setup_score": 0.6299123495573484, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.5600036460823045, "leading_score": 0.5625182269918029}, {"i": 17, "ticker": "OUT", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/OUT.png", "name": "OUTFRONT Media Inc. Common Stock", "sector": "Real Estate", "industry": "REIT - Specialty", "themes": ["🏢 REIT"], "price": 30.3799991607666, "rs": 0.8957552909851074, "rs_line_vs_hi_pct": -0.8686095087391377, "vs_hi_pct": 0.0, "vcp_ratio": 0.7416494526528152, "vol_contraction": 0.5529775167905624, "setup_score": 0.6295485042302927, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.4554157169953224, "leading_score": 0.8645934296001719}, {"i": 18, "ticker": "ZD", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/ZD.png", "name": "Ziff Davis, Inc. - Common Stock", "sector": "Communication Services", "industry": "Advertising Agencies", "themes": ["📺 広告"], "price": 48.22999954223633, "rs": 0.8152309656143188, "rs_line_vs_hi_pct": 0.0, "vs_hi_pct": 0.0, "vcp_ratio": 0.6709977963466585, "vol_contraction": 0.3660355875179798, "setup_score": 0.6261000061387845, "yartseva": 1.0, "comp_pass": 1.0, "comp_score": 0.6715121516039476, "leading_score": 0.866187783538318}, {"i": 19, "ticker": "RIO", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/RIO.png", "name": "Rio Tinto Plc Common Stock", "sector": "Basic Materials", "industry": "Other Industrial Metals & Mining", "themes": ["🏭 鉱業/素材"], "price": 99.94999694824219, "rs": 0.8250104188919067, "rs_line_vs_hi_pct": -3.366601070080366, "vs_hi_pct": -0.8235752582550049, "vcp_ratio": 0.6742854475784155, "vol_contraction": 0.6440100818068168, "setup_score": 0.6256163073300648, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.46714134166309607, "leading_score": 0.7573013452232862}, {"i": 20, "ticker": "OBT", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/OBT.png", "name": "Orange County Bancorp, Inc. - Common Stock", "sector": "Financial Services", "industry": "Banks - Regional", "themes": ["🏦 銀行"], "price": 35.38999938964844, "rs": 0.8121098875999451, "rs_line_vs_hi_pct": -3.969091495501864, "vs_hi_pct": -3.1737327575683594, "vcp_ratio": 0.7922963102752594, "vol_contraction": 0.6284583734018571, "setup_score": 0.6211565885515877, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.6239870457954549, "leading_score": 0.7379034672495663}, {"i": 21, "ticker": "LFUS", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/LFUS.png", "name": "Littelfuse, Inc. - Common Stock", "sector": "Technology", "industry": "Electronic Components", "themes": ["🔌 電子部品"], "price": 403.0199890136719, "rs": 0.9115688800811768, "rs_line_vs_hi_pct": -1.0119431857670058, "vs_hi_pct": -1.0119438171386719, "vcp_ratio": 0.6846325860372714, "vol_contraction": 0.6325641093983324, "setup_score": 0.6178648941649233, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.46871192167608905, "leading_score": 0.8704386077291979}, {"i": 22, "ticker": "SHIP", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/SHIP.png", "name": "Seanergy Maritime Holdings Corp. - Common Stock", "sector": "Industrials", "industry": "Marine Shipping", "themes": ["🚢 海運"], "price": 14.289999961853027, "rs": 0.9354972839355469, "rs_line_vs_hi_pct": -7.196901001414346, "vs_hi_pct": -4.575562477111816, "vcp_ratio": 0.7882776648415242, "vol_contraction": 0.5451566949690086, "setup_score": 0.61757623650753, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.7617165548414664, "leading_score": 0.7390761481391059}, {"i": 23, "ticker": "ASTE", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/ASTE.png", "name": "Astec Industries, Inc. - Common Stock", "sector": "Industrials", "industry": "Farm & Heavy Construction Machinery", "themes": ["🚜 重機"], "price": 58.75, "rs": 0.820016622543335, "rs_line_vs_hi_pct": -11.254900441250815, "vs_hi_pct": -8.10261344909668, "vcp_ratio": 0.8415721053025803, "vol_contraction": 0.5709273217627358, "setup_score": 0.6172097548669114, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.5507162907332322, "leading_score": 0.5961994327048352}, {"i": 24, "ticker": "MPC", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/MPC.png", "name": "Marathon Petroleum Corporation Common Stock", "sector": "Energy", "industry": "", "themes": [], "price": 227.2100067138672, "rs": 0.8206408619880676, "rs_line_vs_hi_pct": -19.389133564441007, "vs_hi_pct": -9.805088996887207, "vcp_ratio": 0.782152695424096, "vol_contraction": 0.5999150240512283, "setup_score": 0.6164410375808326, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.5810350040564631, "leading_score": 0.5135138492006639}, {"i": 25, "ticker": "MTZ", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/MTZ.png", "name": "MasTec, Inc. Common Stock", "sector": "Industrials", "industry": "Engineering & Construction", "themes": ["🏗️ 建設/インフラ", "⚡ 電力インフラ"], "price": 385.8900146484375, "rs": 0.9594257473945618, "rs_line_vs_hi_pct": 0.0, "vs_hi_pct": 0.0, "vcp_ratio": 0.7531496051859703, "vol_contraction": 0.5990967551507556, "setup_score": 0.6140245724505733, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.4205976137723867, "leading_score": 0.9527046406855348}, {"i": 26, "ticker": "MCY", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/MCY.png", "name": "Mercury General Corporation Common Stock", "sector": "Financial Services", "industry": "", "themes": [], "price": 98.1500015258789, "rs": 0.8146067261695862, "rs_line_vs_hi_pct": -2.0123341613439094, "vs_hi_pct": 0.0, "vcp_ratio": 0.7027478578885129, "vol_contraction": 0.6124073175643342, "setup_score": 0.6139968011943895, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.6161721748501858, "leading_score": 0.7838460148357955}, {"i": 27, "ticker": "TRDA", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/TRDA.png", "name": "Entrada Therapeutics, Inc. - Common Stock", "sector": "Healthcare", "industry": "Biotechnology", "themes": ["🧬 バイオ"], "price": 12.960000038146973, "rs": 0.8907615542411804, "rs_line_vs_hi_pct": -13.856567789060769, "vs_hi_pct": -9.497207641601562, "vcp_ratio": 0.7413056216306757, "vol_contraction": 0.585131918041427, "setup_score": 0.6134332744932451, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.34912178792618415, "leading_score": 0.6051309209486608}, {"i": 28, "ticker": "GSL", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/GSL.png", "name": "Global Ship Lease Inc New Class A Common Shares", "sector": "Industrials", "industry": "Marine Shipping", "themes": ["🚢 海運"], "price": 39.150001525878906, "rs": 0.8154390454292297, "rs_line_vs_hi_pct": -8.694119000385692, "vs_hi_pct": -4.744517803192139, "vcp_ratio": 0.836148077768678, "vol_contraction": 0.5748017250706641, "setup_score": 0.613366612728732, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.7739277467770694, "leading_score": 0.6378973249203521}, {"i": 29, "ticker": "CTRI", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/CTRI.png", "name": "Centuri Holdings, Inc. Common Stock", "sector": "Utilities", "industry": "Utilities - Regulated Gas", "themes": ["⚡ エネルギー", "⚡ 電力インフラ"], "price": 35.40999984741211, "rs": 0.8928422927856445, "rs_line_vs_hi_pct": 0.0, "vs_hi_pct": 0.0, "vcp_ratio": 0.7692787951321657, "vol_contraction": 0.5113374954024739, "setup_score": 0.6118046486456826, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.4159046387195543, "leading_score": 0.9127545679201845}, {"i": 30, "ticker": "NSSC", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/NSSC.png", "name": "NAPCO Security Technologies, Inc. - Common Stock", "sector": "Industrials", "industry": "Security & Protection Services", "themes": ["🔐 セキュリティ", "🔒 セキュリティ"], "price": 46.09000015258789, "rs": 0.8339575529098511, "rs_line_vs_hi_pct": -4.877733522621663, "vs_hi_pct": -2.413719892501831, "vcp_ratio": 0.7180750338509371, "vol_contraction": 0.3426821351504534, "setup_score": 0.6098076319291169, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.5031481066778164, "leading_score": 0.7349829344584425}, {"i": 31, "ticker": "KMT", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/KMT.png", "name": "Kennametal Inc. Common Stock", "sector": "Industrials", "industry": "Tools & Accessories", "themes": ["🔧 工具"], "price": 39.650001525878906, "rs": 0.8834789991378784, "rs_line_vs_hi_pct": -8.514885701733144, "vs_hi_pct": -5.098128318786621, "vcp_ratio": 0.8115696331216926, "vol_contraction": 0.579979618320285, "setup_score": 0.6089647800914624, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.5813988835734246, "leading_score": 0.6852786682342571}, {"i": 32, "ticker": "IMO", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/IMO.png", "name": "Imperial Oil Limited Common Stock", "sector": "Energy", "industry": "", "themes": [], "price": 125.88999938964844, "rs": 0.8566375374794006, "rs_line_vs_hi_pct": -13.954554674637142, "vs_hi_pct": -4.888182640075684, "vcp_ratio": 0.852679836518794, "vol_contraction": 0.48853499430620356, "setup_score": 0.6082903873653206, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.6223021519352789, "leading_score": 0.5831992921499173}, {"i": 33, "ticker": "PRE", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/PRE.png", "name": "Prenetics Global Limited - Class A Ordinary Share", "sector": "Healthcare", "industry": "", "themes": [], "price": 19.6200008392334, "rs": 0.9473574757575989, "rs_line_vs_hi_pct": -18.503439051648062, "vs_hi_pct": -11.422115325927734, "vcp_ratio": 0.6118927247071976, "vol_contraction": 0.6160168964677023, "setup_score": 0.6063108591237187, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.4637059862178804, "leading_score": 0.5953726149430475}, {"i": 34, "ticker": "RCKY", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/RCKY.png", "name": "Rocky Brands, Inc. - Common Stock", "sector": "Consumer Cyclical", "industry": "Footwear & Accessories", "themes": ["👟 靴/アクセサリー"], "price": 43.220001220703125, "rs": 0.9338327050209045, "rs_line_vs_hi_pct": -12.245720601545196, "vs_hi_pct": -9.486907958984375, "vcp_ratio": 0.6888182686987576, "vol_contraction": 0.7348600053672064, "setup_score": 0.6053206725207929, "yartseva": 1.0, "comp_pass": 1.0, "comp_score": 0.6606096158950434, "leading_score": 0.6513743161720873}, {"i": 35, "ticker": "JOE", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/JOE.png", "name": "St. Joe Company (The) Common Stock", "sector": "Real Estate", "industry": "", "themes": [], "price": 71.31999969482422, "rs": 0.8156471252441406, "rs_line_vs_hi_pct": -6.274051613067943, "vs_hi_pct": -2.01951265335083, "vcp_ratio": 0.7555969453680256, "vol_contraction": 0.6059717639283815, "setup_score": 0.6043425321337246, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.5142935792134992, "leading_score": 0.6831952087431875}, {"i": 36, "ticker": "SPB", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/SPB.png", "name": "Spectrum Brands Holdings, Inc. Common Stock", "sector": "Consumer Defensive", "industry": "Household & Personal Products", "themes": ["🏠 日用品"], "price": 83.69999694824219, "rs": 0.8262588381767273, "rs_line_vs_hi_pct": -1.1689756342243784, "vs_hi_pct": -1.168978214263916, "vcp_ratio": 0.8324427428665301, "vol_contraction": 0.5874022043148052, "setup_score": 0.6029886162064707, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.6804061022820304, "leading_score": 0.8163381927868925}, {"i": 37, "ticker": "IDCC", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/IDCC.png", "name": "InterDigital, Inc. - Common Stock", "sector": "Technology", "industry": "Software - Application", "themes": ["💻 ソフトウェア", "🤖 AI/HPC"], "price": 362.239990234375, "rs": 0.8094049096107483, "rs_line_vs_hi_pct": -12.505753945144892, "vs_hi_pct": -8.649826049804688, "vcp_ratio": 0.8697613469991374, "vol_contraction": 0.4775239215664315, "setup_score": 0.602427148241, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.5380883758648942, "leading_score": 0.5738032610472868}, {"i": 38, "ticker": "DBD", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/DBD.png", "name": "Diebold Nixdorf Incorporated Common stock", "sector": "Technology", "industry": "Software - Application", "themes": ["💻 ソフトウェア"], "price": 82.33000183105469, "rs": 0.8503953218460083, "rs_line_vs_hi_pct": -7.10303284494117, "vs_hi_pct": -6.797981262207031, "vcp_ratio": 0.9361076100117625, "vol_contraction": 0.6267489802463205, "setup_score": 0.6003178791165242, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.5887441967443025, "leading_score": 0.6902007870769674}, {"i": 39, "ticker": "THR", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/THR.png", "name": "Thermon Group Holdings, Inc. Common Stock", "sector": "Industrials", "industry": "Specialty Industrial Machinery", "themes": ["⚙️ 産業機械"], "price": 54.11000061035156, "rs": 0.9167706966400146, "rs_line_vs_hi_pct": -5.472417064994284, "vs_hi_pct": -2.0987868309020996, "vcp_ratio": 0.7186546151597643, "vol_contraction": 0.4298788933326408, "setup_score": 0.6001563551259534, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.5964403127101475, "leading_score": 0.7679130555067775}, {"i": 40, "ticker": "BKV", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/BKV.png", "name": "BKV Corporation Common Stock", "sector": "Energy", "industry": "", "themes": [], "price": 29.440000534057617, "rs": 0.802746593952179, "rs_line_vs_hi_pct": -12.11848025432517, "vs_hi_pct": -6.539678573608398, "vcp_ratio": 0.8361586397741195, "vol_contraction": 0.6376430785358456, "setup_score": 0.5998868161562636, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.44991069403710837, "leading_score": 0.5756370393304877}, {"i": 41, "ticker": "CASY", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/CASY.png", "name": "Caseys General Stores, Inc. - Common Stock", "sector": "Consumer Cyclical", "industry": "Specialty Retail", "themes": ["🛒 小売"], "price": 804.5, "rs": 0.8705784678459167, "rs_line_vs_hi_pct": -0.1770948389856919, "vs_hi_pct": 0.0, "vcp_ratio": 0.8484386258290263, "vol_contraction": 0.4718692471960347, "setup_score": 0.5990448246046013, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.4520712803194181, "leading_score": 0.8713452711348543}, {"i": 42, "ticker": "IMTX", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/IMTX.png", "name": "Immatics N.V. - Ordinary Shares", "sector": "Healthcare", "industry": "Biotechnology", "themes": ["🧬 バイオ"], "price": 11.350000381469727, "rs": 0.882022500038147, "rs_line_vs_hi_pct": -7.989489516748294, "vs_hi_pct": -4.380786418914795, "vcp_ratio": 0.6862444109564029, "vol_contraction": 0.5318202983586775, "setup_score": 0.5984333686765174, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.3667907041542978, "leading_score": 0.6924193764862033}, {"i": 43, "ticker": "GASS", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/GASS.png", "name": "StealthGas, Inc. - common stock", "sector": "Industrials", "industry": "Marine Shipping", "themes": ["🚢 海運"], "price": 9.670000076293945, "rs": 0.8589263558387756, "rs_line_vs_hi_pct": -10.00764610877013, "vs_hi_pct": -6.116503715515137, "vcp_ratio": 0.8008963652765995, "vol_contraction": 0.4596429055838208, "setup_score": 0.5976562903528435, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.6363597466452247, "leading_score": 0.6435889766081652}, {"i": 44, "ticker": "PCVX", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/PCVX.png", "name": "Vaxcyte, Inc. - Common Stock", "sector": "Healthcare", "industry": "Biotechnology", "themes": ["🧬 バイオ"], "price": 59.720001220703125, "rs": 0.8401997685432434, "rs_line_vs_hi_pct": -8.629816320882732, "vs_hi_pct": -5.2664995193481445, "vcp_ratio": 0.7880092166871482, "vol_contraction": 0.6992715814877902, "setup_score": 0.5975000406737595, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.29506203563259525, "leading_score": 0.6556681426279315}, {"i": 45, "ticker": "GNRC", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/GNRC.png", "name": "Generac Holdlings Inc. Common Stock", "sector": "Industrials", "industry": "Specialty Industrial Machinery", "themes": ["⚙️ 産業機械", "⚡ 電力インフラ"], "price": 220.3000030517578, "rs": 0.8508114814758301, "rs_line_vs_hi_pct": -9.42533588253106, "vs_hi_pct": -6.881392002105713, "vcp_ratio": 0.8219818908720207, "vol_contraction": 0.5959524561951368, "setup_score": 0.5972944748887337, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.45759610259745365, "leading_score": 0.647463221389305}, {"i": 46, "ticker": "XENE", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/XENE.png", "name": "Xenon Pharmaceuticals Inc. - Common Shares", "sector": "Healthcare", "industry": "Biotechnology", "themes": ["🧬 バイオ"], "price": 54.2599983215332, "rs": 0.8456096649169922, "rs_line_vs_hi_pct": -17.548203909476932, "vs_hi_pct": -13.543659210205078, "vcp_ratio": 0.6942375860128996, "vol_contraction": 0.44417563450319225, "setup_score": 0.5971494125453797, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.2820974410642399, "leading_score": 0.5423385003876816}, {"i": 47, "ticker": "LMAT", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/LMAT.png", "name": "LeMaitre Vascular, Inc. - Common Stock", "sector": "Healthcare", "industry": "Medical Instruments & Supplies", "themes": ["🏥 医療機器"], "price": 114.5199966430664, "rs": 0.8046192526817322, "rs_line_vs_hi_pct": -5.6541376007990145, "vs_hi_pct": -2.44484543800354, "vcp_ratio": 0.7847165308902436, "vol_contraction": 0.5599156064857872, "setup_score": 0.596759187810455, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.509217392029459, "leading_score": 0.6947934333743945}, {"i": 48, "ticker": "KB", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/KB.png", "name": "KB Financial Group Inc", "sector": "Financial Services", "industry": "Banks - Regional", "themes": ["🏦 銀行"], "price": 106.76000213623047, "rs": 0.8050353527069092, "rs_line_vs_hi_pct": -12.02131366940733, "vs_hi_pct": -9.686147689819336, "vcp_ratio": 0.8278550972991573, "vol_contraction": 0.6793281258749938, "setup_score": 0.5956375571867039, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.5178900781771585, "leading_score": 0.5777388979936993}, {"i": 49, "ticker": "APGE", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/APGE.png", "name": "Apogee Therapeutics, Inc. - Common Stock", "sector": "Healthcare", "industry": "Biotechnology", "themes": ["🧬 バイオ"], "price": 86.47000122070312, "rs": 0.9186433553695679, "rs_line_vs_hi_pct": -7.681630944853235, "vs_hi_pct": -7.681632041931152, "vcp_ratio": 0.8482014932245734, "vol_contraction": 0.5568872801273927, "setup_score": 0.5953267904649686, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.3280434788840604, "leading_score": 0.7209492309714493}, {"i": 50, "ticker": "CLMT", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/CLMT.png", "name": "Calumet, Inc - Common Stock", "sector": "Basic Materials", "industry": "Specialty Chemicals", "themes": ["🧪 化学"], "price": 30.75, "rs": 0.9394506812095642, "rs_line_vs_hi_pct": -21.877604192514198, "vs_hi_pct": -14.345407485961914, "vcp_ratio": 0.7147064449786814, "vol_contraction": 0.530261620329267, "setup_score": 0.5946478737477455, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.35605149368469025, "leading_score": 0.5760566130579061}, {"i": 51, "ticker": "PWR", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/PWR.png", "name": "Quanta Services, Inc. Common Stock", "sector": "Industrials", "industry": "Engineering & Construction", "themes": ["🏗️ 建設/インフラ", "⚡ 電力インフラ"], "price": 637.280029296875, "rs": 0.898876428604126, "rs_line_vs_hi_pct": 0.0, "vs_hi_pct": 0.0, "vcp_ratio": 0.7698093547093924, "vol_contraction": 0.6562770238838393, "setup_score": 0.5946041571710041, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.4119687446857033, "leading_score": 0.9163750732531313}, {"i": 52, "ticker": "ORN", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/ORN.png", "name": "Orion Group Holdings, Inc. Common", "sector": "Industrials", "industry": "", "themes": [], "price": 12.1899995803833, "rs": 0.8175197839736938, "rs_line_vs_hi_pct": -17.478686046060332, "vs_hi_pct": -15.288400650024414, "vcp_ratio": 0.6073202588186631, "vol_contraction": 0.4633567367378883, "setup_score": 0.5935571142455618, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.476077326886822, "leading_score": 0.5262131692716115}, {"i": 53, "ticker": "MSGS", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/MSGS.png", "name": "Madison Square Garden Sports Corp. Class A Common Stock (New)", "sector": "Communication Services", "industry": "Entertainment", "themes": ["🎬 エンタメ"], "price": 335.1199951171875, "rs": 0.8570536971092224, "rs_line_vs_hi_pct": -5.310734864925381, "vs_hi_pct": -1.9428908824920654, "vcp_ratio": 0.8237270281101505, "vol_contraction": 0.6276229606033402, "setup_score": 0.5931932811789782, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.31028553616352755, "leading_score": 0.7364544404877557}, {"i": 54, "ticker": "DHT", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/DHT.png", "name": "DHT Holdings, Inc.", "sector": "Energy", "industry": "Oil & Gas Midstream", "themes": ["🛢️ 石油/ガス", "🚢 タンカー"], "price": 18.34000015258789, "rs": 0.8789013624191284, "rs_line_vs_hi_pct": -9.868208125912592, "vs_hi_pct": -6.666666030883789, "vcp_ratio": 0.9337585928706652, "vol_contraction": 0.5291767475183514, "setup_score": 0.593138383722714, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.5241749597080103, "leading_score": 0.6599455652558304}, {"i": 55, "ticker": "SSRM", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/SSRM.png", "name": "SSR Mining Inc. - Common Stock", "sector": "Basic Materials", "industry": "Gold", "themes": ["⛏️ 金"], "price": 30.75, "rs": 0.9350811243057251, "rs_line_vs_hi_pct": -16.565495710443955, "vs_hi_pct": -12.343221664428711, "vcp_ratio": 0.6477918602721541, "vol_contraction": 0.480112718519662, "setup_score": 0.5930862433465507, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.6158362601921634, "leading_score": 0.6062217283987174}, {"i": 56, "ticker": "INVX", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/INVX.png", "name": "Innovex International, Inc. Common Stock", "sector": "Energy", "industry": "", "themes": [], "price": 28.049999237060547, "rs": 0.8358302116394043, "rs_line_vs_hi_pct": -6.523938673363105, "vs_hi_pct": -4.102563858032227, "vcp_ratio": 0.7231699363750217, "vol_contraction": 0.38199718401789806, "setup_score": 0.5908948374962915, "yartseva": 1.0, "comp_pass": 1.0, "comp_score": 0.6715116868029649, "leading_score": 0.6931192920724768}, {"i": 57, "ticker": "INGM", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/INGM.png", "name": "Ingram Micro Holding Corporation Common Stock", "sector": "Technology", "industry": "Information Technology Services", "themes": ["💻 ソフトウェア"], "price": 30.18000030517578, "rs": 0.8647524118423462, "rs_line_vs_hi_pct": -2.203500621278942, "vs_hi_pct": -2.203500270843506, "vcp_ratio": 0.7916179526350354, "vol_contraction": 0.6309534181274755, "setup_score": 0.5906489743430836, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.6336946277092781, "leading_score": 0.8117476338897247}, {"i": 58, "ticker": "MT", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/MT.png", "name": "Arcelor Mittal NY Registry Shares NEW", "sector": "Basic Materials", "industry": "Steel", "themes": ["🏭 鉱業/素材"], "price": 59.029998779296875, "rs": 0.8730753064155579, "rs_line_vs_hi_pct": -15.24505602484767, "vs_hi_pct": -12.0530424118042, "vcp_ratio": 0.6776187392953579, "vol_contraction": 0.6333475013484432, "setup_score": 0.5900766309660028, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.5356111636084502, "leading_score": 0.579218601963342}, {"i": 59, "ticker": "AA", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/AA.png", "name": "Alcoa Corporation Common Stock ", "sector": "Basic Materials", "industry": "Aluminum", "themes": ["🏭 鉱業/素材"], "price": 67.36000061035156, "rs": 0.9238451719284058, "rs_line_vs_hi_pct": -14.272712927351206, "vs_hi_pct": -8.116215705871582, "vcp_ratio": 0.7768447600980982, "vol_contraction": 0.6487696748774412, "setup_score": 0.5897648852887665, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.46775984031874057, "leading_score": 0.6206094710987556}, {"i": 60, "ticker": "NVRI", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/NVRI.png", "name": "Enviri Corporation Common Stock", "sector": "Industrials", "industry": "Waste Management", "themes": ["♻️ 環境"], "price": 19.350000381469727, "rs": 0.9178110957145691, "rs_line_vs_hi_pct": -10.178184072774666, "vs_hi_pct": -2.7638137340545654, "vcp_ratio": 0.7752862461972323, "vol_contraction": 0.4279616681100022, "setup_score": 0.5890959972127521, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.38877250925393225, "leading_score": 0.6767340162629856}, {"i": 61, "ticker": "NGVT", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/NGVT.png", "name": "Ingevity Corporation Common Stock ", "sector": "Basic Materials", "industry": "Specialty Chemicals", "themes": ["🧪 化学"], "price": 76.31999969482422, "rs": 0.8766125440597534, "rs_line_vs_hi_pct": -4.381244829421737, "vs_hi_pct": -0.3264963626861572, "vcp_ratio": 0.7641146959510366, "vol_contraction": 0.46099855986655014, "setup_score": 0.5884077936627178, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.48640641661094053, "leading_score": 0.7715048789760889}, {"i": 62, "ticker": "RRBI", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/RRBI.png", "name": "Red River Bancshares, Inc. - Common Stock", "sector": "Financial Services", "industry": "Banks - Regional", "themes": ["🏦 銀行"], "price": 94.11499786376953, "rs": 0.8576778769493103, "rs_line_vs_hi_pct": -6.8047709987116285, "vs_hi_pct": -4.53416109085083, "vcp_ratio": 0.8905681051654132, "vol_contraction": 0.6553012227781062, "setup_score": 0.5881518341661177, "yartseva": 1.0, "comp_pass": 1.0, "comp_score": 0.6418842972362887, "leading_score": 0.699670526130169}, {"i": 63, "ticker": "AGX", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/AGX.png", "name": "Argan, Inc. Common Stock", "sector": "Industrials", "industry": "", "themes": [], "price": 660.8499755859375, "rs": 0.9787765145301819, "rs_line_vs_hi_pct": 0.0, "vs_hi_pct": 0.0, "vcp_ratio": 0.8253998958836335, "vol_contraction": 0.5117690947197706, "setup_score": 0.5880274422904697, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.6047593443600064, "leading_score": 0.964315089045978}, {"i": 64, "ticker": "SBLK", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/SBLK.png", "name": "Star Bulk Carriers Corp. - Common Shares", "sector": "Industrials", "industry": "Marine Shipping", "themes": ["🚢 海運"], "price": 24.579999923706055, "rs": 0.8091968297958374, "rs_line_vs_hi_pct": -11.726102657640602, "vs_hi_pct": -8.590555191040039, "vcp_ratio": 0.9782937910616031, "vol_contraction": 0.4521303713667983, "setup_score": 0.5871178591020179, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.666878698496864, "leading_score": 0.5824215885177119}, {"i": 65, "ticker": "NATR", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/NATR.png", "name": "Nature's Sunshine Products, Inc. - Common Stock", "sector": "Consumer Defensive", "industry": "Packaged Foods", "themes": ["🍔 食品"], "price": 27.43000030517578, "rs": 0.9155222773551941, "rs_line_vs_hi_pct": -4.715503164298185, "vs_hi_pct": -1.3309299945831299, "vcp_ratio": 0.8410854531272591, "vol_contraction": 0.5171524114090622, "setup_score": 0.5871100008776374, "yartseva": 1.0, "comp_pass": 1.0, "comp_score": 0.6325837075892453, "leading_score": 0.7861075376335172}, {"i": 66, "ticker": "ATNI", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/ATNI.png", "name": "ATN International, Inc. - Common Stock", "sector": "Communication Services", "industry": "Telecom Services", "themes": ["📡 通信"], "price": 28.239999771118164, "rs": 0.8784852027893066, "rs_line_vs_hi_pct": -9.309241839476956, "vs_hi_pct": -5.614972114562988, "vcp_ratio": 0.7692973565546625, "vol_contraction": 0.697755006495222, "setup_score": 0.5869371105808656, "yartseva": 1.0, "comp_pass": 1.0, "comp_score": 0.7021889842256774, "leading_score": 0.6655246609981377}, {"i": 67, "ticker": "OVV", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/OVV.png", "name": "Ovintiv Inc. (DE)", "sector": "Energy", "industry": "", "themes": [], "price": 56.939998626708984, "rs": 0.8595505356788635, "rs_line_vs_hi_pct": -18.0257824275727, "vs_hi_pct": -8.279645919799805, "vcp_ratio": 0.9181337208697868, "vol_contraction": 0.5260711542111532, "setup_score": 0.5866071807127498, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.6816161196855344, "leading_score": 0.5485172066532198}, {"i": 68, "ticker": "CM", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/CM.png", "name": "Canadian Imperial Bank of Commerce Common Stock", "sector": "Financial Services", "industry": "Banks - Diversified", "themes": ["🏦 銀行"], "price": 110.36000061035156, "rs": 0.8443611860275269, "rs_line_vs_hi_pct": 0.0, "vs_hi_pct": 0.0, "vcp_ratio": 0.7521774613346086, "vol_contraction": 0.7418364889814247, "setup_score": 0.584479602706738, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.5938050318989313, "leading_score": 0.8836658919443849}, {"i": 69, "ticker": "LOCO", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/LOCO.png", "name": "El Pollo Loco Holdings, Inc. - Common Stock", "sector": "Consumer Cyclical", "industry": "Restaurants", "themes": ["🍽️ 外食"], "price": 13.789999961853027, "rs": 0.8210570216178894, "rs_line_vs_hi_pct": -11.230304697315386, "vs_hi_pct": -3.7683188915252686, "vcp_ratio": 0.5814405869057764, "vol_contraction": 0.690915925807044, "setup_score": 0.5843747401185126, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.6598411686612481, "leading_score": 0.5975522695994768}, {"i": 70, "ticker": "KEN", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/KEN.png", "name": "Kenon Holdings Ltd. Ordinary Shares", "sector": "Utilities", "industry": "Utilities - Independent Power Producers", "themes": ["⚡ 電力", "⚡ 電力インフラ"], "price": 83.91000366210938, "rs": 0.915730357170105, "rs_line_vs_hi_pct": -10.563326230718474, "vs_hi_pct": -4.831570625305176, "vcp_ratio": 0.5864818547574231, "vol_contraction": 0.9338863695149178, "setup_score": 0.581564112992056, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.5209677014944715, "leading_score": 0.6696568173788936}, {"i": 71, "ticker": "CLDX", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/CLDX.png", "name": "Celldex Therapeutics, Inc. - Common Stock", "sector": "Healthcare", "industry": "Biotechnology", "themes": ["🧬 バイオ"], "price": 33.65999984741211, "rs": 0.8347898721694946, "rs_line_vs_hi_pct": -4.347822787738387, "vs_hi_pct": -4.347825050354004, "vcp_ratio": 0.778675287257928, "vol_contraction": 0.6254235604812479, "setup_score": 0.5803779916617684, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.309152497310691, "leading_score": 0.7471398613709135}, {"i": 72, "ticker": "KW", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/KW.png", "name": "Kennedy-Wilson Holdings Inc. Common Stock", "sector": "Real Estate", "industry": "Real Estate Services", "themes": ["🏢 不動産"], "price": 10.899999618530273, "rs": 0.8143986463546753, "rs_line_vs_hi_pct": -11.627182180613882, "vs_hi_pct": -0.7285952568054199, "vcp_ratio": 0.2470856008583096, "vol_contraction": 0.3627835406115898, "setup_score": 0.580368457489286, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.45402185578691523, "leading_score": 0.5891856537816303}, {"i": 73, "ticker": "CRC", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/CRC.png", "name": "California Resources Corporation Common Stock", "sector": "Energy", "industry": "", "themes": [], "price": 65.30000305175781, "rs": 0.8514357209205627, "rs_line_vs_hi_pct": -15.617660333277906, "vs_hi_pct": -5.663103103637695, "vcp_ratio": 0.8956898158892012, "vol_contraction": 0.49040789370392546, "setup_score": 0.5798210049253402, "yartseva": 1.0, "comp_pass": 1.0, "comp_score": 0.6577753756489102, "leading_score": 0.5640490702375471}, {"i": 74, "ticker": "TPC", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/TPC.png", "name": "Tutor Perini Corporation Common Stock", "sector": "Industrials", "industry": "Engineering & Construction", "themes": ["🏗️ 建設/インフラ"], "price": 87.5, "rs": 0.9465251564979553, "rs_line_vs_hi_pct": -5.087235869283013, "vs_hi_pct": -2.1033763885498047, "vcp_ratio": 0.7064000585509814, "vol_contraction": 0.6070681499648394, "setup_score": 0.5795302736318362, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.6067016155046068, "leading_score": 0.7966947408538916}, {"i": 75, "ticker": "MUR", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/MUR.png", "name": "Murphy Oil Corporation Common Stock", "sector": "Energy", "industry": "Oil & Gas E&P", "themes": ["🛢️ 石油/ガス"], "price": 39.36000061035156, "rs": 0.860590934753418, "rs_line_vs_hi_pct": -16.48234460203447, "vs_hi_pct": -7.908284664154053, "vcp_ratio": 0.8166275504728961, "vol_contraction": 0.5504688086422105, "setup_score": 0.5791032875085979, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.558769272200558, "leading_score": 0.5622562001963131}, {"i": 76, "ticker": "DNTH", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/DNTH.png", "name": "Dianthus Therapeutics, Inc. - Common Stock", "sector": "Healthcare", "industry": "Biotechnology", "themes": ["🧬 バイオ"], "price": 87.16000366210938, "rs": 0.9816895723342896, "rs_line_vs_hi_pct": -10.297777590942502, "vs_hi_pct": -8.980780601501465, "vcp_ratio": 0.7869316488755155, "vol_contraction": 0.46567205682044843, "setup_score": 0.577531009890835, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.37450212365266083, "leading_score": 0.7114181269062021}, {"i": 77, "ticker": "ROST", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/ROST.png", "name": "Ross Stores, Inc. - Common Stock", "sector": "Consumer Cyclical", "industry": "Apparel Retail", "themes": ["👗 アパレル"], "price": 226.1699981689453, "rs": 0.8468580842018127, "rs_line_vs_hi_pct": -5.135781977694565, "vs_hi_pct": -1.304769515991211, "vcp_ratio": 0.8350104317710322, "vol_contraction": 0.5664384020902619, "setup_score": 0.5767360204738528, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.40823958582219905, "leading_score": 0.7347086812846213}, {"i": 78, "ticker": "UFCS", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/UFCS.png", "name": "United Fire Group, Inc - Common Stock", "sector": "Financial Services", "industry": "", "themes": [], "price": 40.470001220703125, "rs": 0.8012900352478027, "rs_line_vs_hi_pct": -3.23133964078135, "vs_hi_pct": 0.0, "vcp_ratio": 0.7859758384294206, "vol_contraction": 0.667287229971901, "setup_score": 0.5764007092297975, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.7042422072880121, "leading_score": 0.748897906557024}, {"i": 79, "ticker": "CGAU", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/CGAU.png", "name": "Centerra Gold Inc. Common Shares", "sector": "Basic Materials", "industry": "Gold", "themes": ["⛏️ 金"], "price": 18.81999969482422, "rs": 0.9330004453659058, "rs_line_vs_hi_pct": -13.6129640840416, "vs_hi_pct": -10.50879955291748, "vcp_ratio": 0.8067926694956716, "vol_contraction": 0.7071559321016675, "setup_score": 0.5749254373757293, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.5592146213876791, "leading_score": 0.6333886096603449}, {"i": 80, "ticker": "CC", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/CC.png", "name": "Chemours Company (The) Common Stock", "sector": "Basic Materials", "industry": "Specialty Chemicals", "themes": ["🧪 化学"], "price": 26.479999542236328, "rs": 0.9417394995689392, "rs_line_vs_hi_pct": -0.4885421463111994, "vs_hi_pct": -0.4885435104370117, "vcp_ratio": 0.8329608755762823, "vol_contraction": 0.5753465740293, "setup_score": 0.5712007160539612, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.39170908659564946, "leading_score": 0.9031129641828207}, {"i": 81, "ticker": "SFL", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/SFL.png", "name": "SFL Corporation Ltd", "sector": "Industrials", "industry": "", "themes": [], "price": 11.170000076293945, "rs": 0.8300041556358337, "rs_line_vs_hi_pct": -6.19157651555734, "vs_hi_pct": -0.8873164653778076, "vcp_ratio": 0.8490564654560266, "vol_contraction": 0.5678791011705372, "setup_score": 0.5707221434511395, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.6493122729636485, "leading_score": 0.6939952133674656}, {"i": 82, "ticker": "CBL", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/CBL.png", "name": "CBL & Associates Properties, Inc. Common Stock", "sector": "Real Estate", "industry": "REIT - Retail", "themes": ["🏢 REIT"], "price": 45.13999938964844, "rs": 0.8807740211486816, "rs_line_vs_hi_pct": 0.0, "vs_hi_pct": 0.0, "vcp_ratio": 0.8674887980414304, "vol_contraction": 0.6396808731260402, "setup_score": 0.5699975798140052, "yartseva": 1.0, "comp_pass": 1.0, "comp_score": 0.6137727236265709, "leading_score": 0.9055136168589357}, {"i": 83, "ticker": "SB", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/SB.png", "name": "Safe Bulkers, Inc Common Stock ($0.001 par value)", "sector": "Industrials", "industry": "Marine Shipping", "themes": ["🚢 海運"], "price": 6.599999904632568, "rs": 0.8736995458602905, "rs_line_vs_hi_pct": -7.484941936592627, "vs_hi_pct": -1.9316494464874268, "vcp_ratio": 0.8516578138621779, "vol_contraction": 0.45223046244688225, "setup_score": 0.5698683821884711, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.754852642812567, "leading_score": 0.6954401520866297}, {"i": 84, "ticker": "GNK", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/GNK.png", "name": "Genco Shipping & Trading Limited Ordinary Shares New (Marshall Islands)", "sector": "Industrials", "industry": "Marine Shipping", "themes": ["🚢 海運"], "price": 23.75, "rs": 0.8497711420059204, "rs_line_vs_hi_pct": -9.267843528974652, "vs_hi_pct": -3.55721116065979, "vcp_ratio": 0.8424214911611702, "vol_contraction": 0.49246302027955113, "setup_score": 0.5683819704530102, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.4984503235717595, "leading_score": 0.6497534313488528}, {"i": 85, "ticker": "MYRG", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/MYRG.png", "name": "MYR Group, Inc. - Common Stock", "sector": "Industrials", "industry": "Engineering & Construction", "themes": ["🏗️ 建設/インフラ", "⚡ 電力インフラ"], "price": 346.3699951171875, "rs": 0.9336246252059937, "rs_line_vs_hi_pct": 0.0, "vs_hi_pct": 0.0, "vcp_ratio": 0.7886573088781179, "vol_contraction": 0.7184531795404396, "setup_score": 0.5682525728085746, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.5354978465536111, "leading_score": 0.9372240031351808}, {"i": 86, "ticker": "DAN", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/DAN.png", "name": "Dana Incorporated Common Stock ", "sector": "Consumer Cyclical", "industry": "Auto Parts", "themes": ["🚗 自動車部品", "🔋 EV"], "price": 38.47999954223633, "rs": 0.9531835317611694, "rs_line_vs_hi_pct": -1.155922834348455, "vs_hi_pct": -1.1559247970581055, "vcp_ratio": 0.9139645760418713, "vol_contraction": 0.5287787856766887, "setup_score": 0.5673420691600767, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.5730765918500695, "leading_score": 0.8932216183083956}, {"i": 87, "ticker": "PED", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/PED.png", "name": "Pedevco Corp. Common Stock", "sector": "Energy", "industry": "", "themes": [], "price": 16.709999084472656, "rs": 0.8408239483833313, "rs_line_vs_hi_pct": -15.09661895645994, "vs_hi_pct": -8.085817337036133, "vcp_ratio": 0.6306458574871345, "vol_contraction": 0.4102788497203835, "setup_score": 0.5666732031290915, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.7442893807365313, "leading_score": 0.5627821650227128}, {"i": 88, "ticker": "MOV", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/MOV.png", "name": "Movado Group Inc. Common Stock", "sector": "Consumer Cyclical", "industry": "Luxury Goods", "themes": ["💎 高級品"], "price": 27.329999923706055, "rs": 0.8716188073158264, "rs_line_vs_hi_pct": -6.146980988804351, "vs_hi_pct": -6.146979331970215, "vcp_ratio": 0.8335296978868292, "vol_contraction": 0.7311587448998191, "setup_score": 0.5666649709426396, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.5352988216023501, "leading_score": 0.7196926435486215}, {"i": 89, "ticker": "ESEA", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/ESEA.png", "name": "Euroseas Ltd. - Common Stock", "sector": "Industrials", "industry": "Marine Shipping", "themes": ["🚢 海運"], "price": 69.41999816894531, "rs": 0.8664169907569885, "rs_line_vs_hi_pct": -8.542705689621233, "vs_hi_pct": -5.589556694030762, "vcp_ratio": 0.8354708825983567, "vol_contraction": 0.6233438186336874, "setup_score": 0.5652710741114793, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.5756057268184752, "leading_score": 0.6735842563849763}, {"i": 90, "ticker": "JCI", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/JCI.png", "name": "Johnson Controls International plc Ordinary Share", "sector": "Industrials", "industry": "Building Products & Equipment", "themes": ["🏗️ 建材"], "price": 143.3800048828125, "rs": 0.8272992372512817, "rs_line_vs_hi_pct": -4.811122811437373, "vs_hi_pct": -1.4299452304840088, "vcp_ratio": 0.8752286391364735, "vol_contraction": 0.6223976422574746, "setup_score": 0.5632855102486908, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.408513571391045, "leading_score": 0.7317165305922808}, {"i": 91, "ticker": "HSHP", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/HSHP.png", "name": "Himalaya Shipping Ltd. Common Shares", "sector": "Industrials", "industry": "Marine Shipping", "themes": ["🚢 海運"], "price": 13.609999656677246, "rs": 0.9371618628501892, "rs_line_vs_hi_pct": -10.687203459917704, "vs_hi_pct": -7.477909088134766, "vcp_ratio": 0.9145422241485207, "vol_contraction": 0.8096174509760408, "setup_score": 0.5622402908910119, "yartseva": 1.0, "comp_pass": 1.0, "comp_score": 0.6561644579195467, "leading_score": 0.6796013548291664}, {"i": 92, "ticker": "PTGX", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/PTGX.png", "name": "Protagonist Therapeutics, Inc. - Common Stock", "sector": "Healthcare", "industry": "Biotechnology", "themes": ["🧬 バイオ"], "price": 98.51000213623047, "rs": 0.8868081569671631, "rs_line_vs_hi_pct": -14.37413471418939, "vs_hi_pct": -7.105469703674316, "vcp_ratio": 0.9179394140133218, "vol_contraction": 0.7145736805202203, "setup_score": 0.5612731349802618, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.37868537383218925, "leading_score": 0.5962015174559991}, {"i": 93, "ticker": "ALTO", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/ALTO.png", "name": "Alto Ingredients, Inc. - Common Stock", "sector": "Basic Materials", "industry": "Specialty Chemicals", "themes": ["🧪 化学"], "price": 5.489999771118164, "rs": 0.9923012852668762, "rs_line_vs_hi_pct": 0.0, "vs_hi_pct": 0.0, "vcp_ratio": 0.8548198248831793, "vol_contraction": 0.5565517927101561, "setup_score": 0.5604824179309327, "yartseva": 0.0, "comp_pass": 1.0, "comp_score": 0.6500533764149972, "leading_score": 0.9724299634089235}, {"i": 94, "ticker": "C", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/C.png", "name": "Citigroup, Inc. Common Stock", "sector": "Financial Services", "industry": "Banks - Diversified", "themes": ["🏦 銀行"], "price": 129.13999938964844, "rs": 0.8241780996322632, "rs_line_vs_hi_pct": -3.35529059211388, "vs_hi_pct": -2.476966381072998, "vcp_ratio": 0.8196490652580822, "vol_contraction": 0.6370097814857627, "setup_score": 0.560087221147471, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.37168880499572615, "leading_score": 0.7589877400567623}, {"i": 95, "ticker": "AMAT", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/AMAT.png", "name": "Applied Materials, Inc. - Common Stock", "sector": "Technology", "industry": "Semiconductor Equipment & Materials", "themes": ["🔧 半導体装置"], "price": 404.8599853515625, "rs": 0.9390345215797424, "rs_line_vs_hi_pct": -3.0526885580936303, "vs_hi_pct": -2.920585870742798, "vcp_ratio": 0.7838354012792635, "vol_contraction": 0.7068585529587171, "setup_score": 0.559905767571336, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.43474416312957065, "leading_score": 0.8359161592137836}, {"i": 96, "ticker": "CAPR", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/CAPR.png", "name": "Capricor Therapeutics, Inc. - Common Stock", "sector": "Healthcare", "industry": "Biotechnology", "themes": ["🧬 バイオ"], "price": 35.099998474121094, "rs": 0.9864752292633057, "rs_line_vs_hi_pct": -1.7986531943995354, "vs_hi_pct": -1.6255676746368408, "vcp_ratio": 0.8441458830391131, "vol_contraction": 0.5614744008526474, "setup_score": 0.5598826709735707, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.2368915434926379, "leading_score": 0.8935244937412075}, {"i": 97, "ticker": "DLX", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/DLX.png", "name": "Deluxe Corporation Common Stock", "sector": "Industrials", "industry": "Conglomerates", "themes": ["🏢 複合企業"], "price": 30.5, "rs": 0.8951311111450195, "rs_line_vs_hi_pct": -0.7619369962645339, "vs_hi_pct": 0.0, "vcp_ratio": 0.9121828363437751, "vol_contraction": 0.6083819990043196, "setup_score": 0.5597474327005433, "yartseva": 1.0, "comp_pass": 0.0, "comp_score": 0.6052960782499127, "leading_score": 0.8685905183165017}, {"i": 98, "ticker": "OKUR", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/OKUR.png", "name": "OnKure Therapeutics, Inc. - Class A Common Stock", "sector": "Healthcare", "industry": "Biotechnology", "themes": ["🧬 バイオ"], "price": 4.989999771118164, "rs": 0.9429879188537598, "rs_line_vs_hi_pct": -1.1849753904313087, "vs_hi_pct": -0.39920806884765625, "vcp_ratio": 0.7449336226604636, "vol_contraction": 0.3475275932791305, "setup_score": 0.5583922445459809, "yartseva": 0.0, "comp_pass": 0.0, "comp_score": 0.41606539629324324, "leading_score": 0.8849184820560809}, {"i": 99, "ticker": "PSTL", "png": "https://vsynfvjstpgslfppbfuo.supabase.co/storage/v1/object/public/flipbook-charts/2026-04-27/PSTL.png", "name": "Postal Realty Trust, Inc. Class A Common Stock", "sector": "Real Estate", "industry": "REIT - Office", "themes": ["🏢 REIT"], "price": 21.809999465942383, "rs": 0.841448187828064, "rs_line_vs_hi_pct": 0.0, "vs_hi_pct": 0.0, "vcp_ratio": 0.9148833946936274, "vol_contraction": 0.5960980939594525, "setup_score": 0.5577059624145873, "yartseva": 1.0, "comp_pass": 1.0, "comp_score": 0.6136967871530548, "leading_score": 0.8819181049456362}];
+  const TOTAL = META.length;
+  let idx = 0;
+
+  const $ = (id) => document.getElementById(id);
+  const fmt = (v, d = 2) => (v == null || Number.isNaN(v)) ? "—" : v.toFixed(d);
+  const fmtPct = (v) => (v == null || Number.isNaN(v)) ? "—" : (v >= 0 ? "+" : "") + v.toFixed(1) + "%";
+
+  function tvUrl(ticker) {
+    return "https://www.tradingview.com/chart/?symbol=" + ticker.replace(/-/g, ".");
+  }
+
+  function scoreCls(v, hi, mid) {
+    if (v >= hi) return "score-high";
+    if (v >= mid) return "score-mid";
+    return "score-low";
+  }
+
+  function render() {
+    if (TOTAL === 0) { $("ticker").textContent = "(empty)"; return; }
+    const m = META[idx];
+    $("counter").textContent = (idx + 1) + " / " + TOTAL;
+    $("ticker").textContent = m.ticker;
+    $("price").textContent = m.price != null ? "$" + fmt(m.price) : "";
+    $("name").textContent = m.name || "";
+    const si = [m.sector, m.industry].filter(Boolean).join(" / ");
+    $("sector").textContent = si;
+    $("themes").innerHTML = (m.themes || [])
+      .map(t => `<span class="theme-badge">${t}</span>`).join("");
+
+    const ss = m.setup_score != null ? Math.round(m.setup_score * 100) : null;
+    const ls = m.leading_score != null ? Math.round(m.leading_score * 100) : null;
+    const rs = m.rs != null ? Math.round(m.rs * 100) : null;
+    $("scores").innerHTML = [
+      `<span class="score-pill ${ss != null ? scoreCls(ss, 70, 55) : "score-low"}">Setup ${ss ?? "—"}</span>`,
+      `<span class="score-pill ${ls != null ? scoreCls(ls, 75, 55) : "score-low"}">Lead ${ls ?? "—"}</span>`,
+      `<span class="score-pill ${rs != null ? scoreCls(rs, 80, 60) : "score-low"}">RS ${rs ?? "—"}</span>`,
+    ].join("");
+
+    $("tv-btn").href = tvUrl(m.ticker);
+
+    const img = $("chart");
+    img.classList.add("loading");
+    img.onload = () => img.classList.remove("loading");
+    img.src = m.png + "?v=" + idx;
+
+    // Progress bar
+    const pct = ((idx + 1) / TOTAL) * 100;
+    $("progressBar").style.width = pct + "%";
+
+    prefetch();
+    history.replaceState(null, "", "?i=" + idx);
+  }
+
+  function prefetch() {
+    for (let d = -2; d <= 2; d++) {
+      const j = idx + d;
+      if (j < 0 || j >= TOTAL || d === 0) continue;
+      new Image().src = META[j].png;
+    }
+  }
+
+  function goto(i) {
+    if (i < 0 || i >= TOTAL) return;
+    idx = i;
+    render();
+  }
+
+  function next() { goto(Math.min(idx + 1, TOTAL - 1)); }
+  function prev() { goto(Math.max(idx - 1, 0)); }
+
+  // ── Swipe detection ───────────────────────────────────────
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  const stage = $("stage");
+
+  stage.addEventListener("touchstart", (e) => {
+    touchStartX = e.changedTouches[0].clientX;
+    touchStartY = e.changedTouches[0].clientY;
+    touchStartTime = Date.now();
+  }, { passive: true });
+
+  stage.addEventListener("touchend", (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    const dt = Date.now() - touchStartTime;
+
+    // Only process swipe if it's more horizontal than vertical
+    if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx) * 0.8 || dt > 500) return;
+
+    if (dx < -40) {
+      // Swipe left → next
+      flashIndicator("right");
+      next();
+    } else if (dx > 40) {
+      // Swipe right → prev
+      flashIndicator("left");
+      prev();
+    }
+  }, { passive: true });
+
+  function flashIndicator(side) {
+    const el = $(side === "left" ? "indLeft" : "indRight");
+    el.classList.add("show");
+    setTimeout(() => el.classList.remove("show"), 300);
+  }
+
+  // ── Tap zones ─────────────────────────────────────────────
+  $("tapLeft").addEventListener("click", (e) => {
+    e.stopPropagation();
+    flashIndicator("left");
+    prev();
+  });
+  $("tapRight").addEventListener("click", (e) => {
+    e.stopPropagation();
+    flashIndicator("right");
+    next();
+  });
+
+  // ── Search ────────────────────────────────────────────────
+  const searchOverlay = $("searchOverlay");
+  const searchInput = $("searchInput");
+  const searchResults = $("searchResults");
+
+  $("searchBtn").addEventListener("click", openSearch);
+  $("searchClose").addEventListener("click", closeSearch);
+
+  function openSearch() {
+    searchOverlay.classList.add("show");
+    searchInput.value = "";
+    searchInput.focus();
+    renderSearch("");
+  }
+
+  function closeSearch() {
+    searchOverlay.classList.remove("show");
+    searchInput.blur();
+  }
+
+  function renderSearch(q) {
+    q = q.trim().toUpperCase();
+    let matches;
+    if (/^\d+$/.test(q)) {
+      const n = parseInt(q, 10) - 1;
+      matches = (n >= 0 && n < TOTAL) ? [META[n]] : [];
+    } else if (!q) {
+      matches = META.slice(0, 50);
+    } else {
+      matches = META.filter(m =>
+        m.ticker.toUpperCase().includes(q) ||
+        (m.name || "").toUpperCase().includes(q)
+      ).slice(0, 50);
+    }
+
+    searchResults.innerHTML = matches.map(m =>
+      `<div class="search-result" data-i="${m.i}">
+         <span class="sr-ticker">${(m.i + 1)}. ${m.ticker}</span>
+         <span class="sr-name">${m.name || ""}</span>
+       </div>`
+    ).join("");
+
+    searchResults.querySelectorAll(".search-result").forEach(el => {
+      el.addEventListener("click", () => {
+        goto(parseInt(el.dataset.i, 10));
+        closeSearch();
+      });
+    });
+  }
+
+  searchInput.addEventListener("input", (e) => renderSearch(e.target.value));
+
+  // ── List mode (jump to Mobile Report if available) ─────────
+  $("listBtn").addEventListener("click", () => {
+    // Try to navigate to the mobile card report in the same directory
+    const mobilePath = "index.html";
+    if (mobilePath && mobilePath !== "{{" + "MOBILE_REPORT_PATH" + "}}") {
+      window.location.href = mobilePath;
+    } else {
+      // fallback: open search
+      openSearch();
+    }
+  });
+
+  // ── Keyboard support (for testing on desktop) ─────────────
+  document.addEventListener("keydown", (e) => {
+    if (searchOverlay.classList.contains("show")) {
+      if (e.key === "Escape") closeSearch();
+      return;
+    }
+    switch (e.key) {
+      case "ArrowRight": case "l": case " ": next(); e.preventDefault(); break;
+      case "ArrowLeft":  case "h":            prev(); e.preventDefault(); break;
+      case "g": case "Home":                  goto(0); e.preventDefault(); break;
+      case "G": case "End":                   goto(TOTAL - 1); e.preventDefault(); break;
+      case "/":                               openSearch(); e.preventDefault(); break;
+    }
+  });
+
+  // ── Init ──────────────────────────────────────────────────
+  const params = new URLSearchParams(location.search);
+  const initial = parseInt(params.get("i") || "0", 10);
+  if (!Number.isNaN(initial) && initial >= 0 && initial < TOTAL) idx = initial;
+  render();
+</script>
+</body>
+</html>
